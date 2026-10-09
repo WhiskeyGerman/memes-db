@@ -1,0 +1,34 @@
+[project]
+name = "memes-platform"
+version = "0.1.0"
+description = "Explicit runtime adapters and HTTP composition helpers"
+requires-python = ">=3.11,<3.15"
+dependencies = ["memes-kernel>=0.1,<0.2", "sqlalchemy[asyncio]>=2.0,<2.1", "asyncpg>=0.30,<1.0", "alembic>=1.15,<2.0", "pydantic-settings>=2.7,<3.0", "fastapi>=0.115,<1.0", "httpx>=0.28,<0.29", "boto3>=1.36,<2.0", "mypy-boto3-s3>=1.36,<2.0", "boto3-stubs[s3]>=1.36,<2.0", "botocore-stubs>=1.36,<2.0", "prometheus-client>=0.22,<1.0"]
+
+[tool.poetry]
+packages = [{include = "memes_platform", from = "src"}]
+
+[tool.poetry.dependencies]
+memes-kernel = {path = "../kernel", develop = true}
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+
+[build-system]
+requires = ["poetry-core>=2.0,<3.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = ">=8.3,<10.0"
+pytest-asyncio = ">=0.25,<2.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib -m 'not worker_ml'"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["worker_ml: opt-in real offline model/container smoke", "integration: requires real PostgreSQL and S3", "gpu: requires an actual GPU and pinned ML weights", "acceptance: validates PRD acceptance scenarios"]

@@ -1,0 +1,3 @@
+from memes_processing_tests.fixtures import coordinator as coordinator
+from memes_processing_tests.fixtures import jpeg_preview as jpeg_preview
+from memes_processing_tests.fixtures import processing_http as processing_http

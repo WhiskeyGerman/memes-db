@@ -1,0 +1,101 @@
+{
+  "architectures": [
+    "JinaEmbeddingsV5OmniModel"
+  ],
+  "auto_map": {
+    "AutoConfig": "modeling_jina_embeddings_v5_omni.JinaEmbeddingsV5OmniConfig",
+    "AutoModel": "modeling_jina_embeddings_v5_omni.JinaEmbeddingsV5OmniModel"
+  },
+  "model_type": "jina_embeddings_v5_omni",
+  "task_names": [
+    "retrieval",
+    "text-matching",
+    "clustering",
+    "classification"
+  ],
+  "special_token_ids": [
+    128256,
+    128257,
+    128258,
+    128259
+  ],
+  "vision_config": {
+    "deepstack_visual_indexes": [],
+    "depth": 12,
+    "dtype": "bfloat16",
+    "hidden_act": "gelu_pytorch_tanh",
+    "hidden_size": 768,
+    "in_channels": 3,
+    "initializer_range": 0.02,
+    "intermediate_size": 3072,
+    "model_type": "",
+    "num_heads": 12,
+    "num_position_embeddings": 2304,
+    "out_hidden_size": 1024,
+    "patch_size": 16,
+    "spatial_merge_size": 2,
+    "temporal_patch_size": 2
+  },
+  "text_config": {
+    "attention_bias": false,
+    "attention_dropout": 0.0,
+    "bos_token_id": 1,
+    "eos_token_id": 2,
+    "head_dim": 64,
+    "hidden_act": "silu",
+    "hidden_size": 768,
+    "initializer_range": 0.02,
+    "intermediate_size": 3072,
+    "is_causal": false,
+    "max_position_embeddings": 8192,
+    "mlp_bias": false,
+    "model_type": "",
+    "num_attention_heads": 12,
+    "num_hidden_layers": 12,
+    "num_key_value_heads": 12,
+    "pad_token_id": null,
+    "pretraining_tp": 1,
+    "rms_norm_eps": 1e-05,
+    "rope_parameters": {
+      "rope_theta": 1000000.0,
+      "rope_type": "default"
+    },
+    "tie_word_embeddings": false,
+    "vocab_size": 128260
+  },
+  "audio_config": {
+    "activation_dropout": 0.0,
+    "activation_function": "gelu",
+    "attention_dropout": 0.0,
+    "d_model": 1280,
+    "dropout": 0.0,
+    "dtype": "float32",
+    "encoder_attention_heads": 20,
+    "encoder_ffn_dim": 5120,
+    "encoder_layers": 32,
+    "initializer_range": 0.02,
+    "max_source_positions": 1500,
+    "num_mel_bins": 128,
+    "scale_embedding": false,
+    "n_window": 100,
+    "output_dim": 3584
+  },
+  "image_token_index": 128259,
+  "audio_token_id": 128256,
+  "audio_start_token_id": 128257,
+  "audio_end_token_id": 128258,
+  "projector_hidden_act": "gelu",
+  "tie_word_embeddings": false,
+  "dtype": "bfloat16",
+  "transformers_version": "5.4.0",
+  "torch_dtype": "bfloat16",
+  "is_matryoshka": true,
+  "matryoshka_dimensions": [
+    32,
+    64,
+    128,
+    256,
+    512,
+    768
+  ]
+}

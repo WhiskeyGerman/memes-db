@@ -1,0 +1,32 @@
+[project]
+name = "memes-kernel"
+version = "0.1.0"
+description = "Minimal framework-independent domain primitives"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+dependencies = []
+
+[tool.poetry]
+packages = [{include = "memes_kernel", from = "src"}]
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+
+[build-system]
+requires = ["poetry-core>=2.0,<3.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = ">=8.3,<10.0"
+pytest-asyncio = ">=0.25,<2.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib -m 'not worker_ml'"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["worker_ml: opt-in real offline model/container smoke", "integration: requires real PostgreSQL and S3", "gpu: requires an actual GPU and pinned ML weights", "acceptance: validates PRD acceptance scenarios"]

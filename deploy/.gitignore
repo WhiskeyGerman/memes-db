@@ -1,0 +1,6 @@
+/.env
+/.env.*
+!/.env.example
+!/.env.worker.example
+/models/
+/results/

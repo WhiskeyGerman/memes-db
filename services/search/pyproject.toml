@@ -1,0 +1,42 @@
+[project]
+name = "memes-search"
+version = "0.1.0"
+description = "Memes DB search service"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+dependencies = ["fastapi>=0.115,<1.0", "uvicorn>=0.30,<1.0", "memes-kernel>=0.1,<0.2", "memes-platform>=0.1,<0.2", "httpx>=0.28,<0.29", "sqlalchemy[asyncio]>=2.0,<2.1", "asyncpg>=0.30,<1.0", "alembic>=1.15,<2.0", "pydantic-settings>=2.7,<3.0", "pgvector>=0.5,<1.0", "python-multipart>=0.0.20,<1.0", "boto3>=1.38,<2.0", "mypy-boto3-s3>=1.38,<2.0"]
+
+[tool.poetry]
+packages = [{include = "memes_search", from = "src"}]
+
+[tool.poetry.dependencies]
+memes-kernel = {path = "../../packages/kernel", develop = true}
+memes-platform = {path = "../../packages/platform", develop = true}
+
+[project.scripts]
+memes-search = "memes_search.presentation.main:main"
+memes-search-index-status = "memes_search.presentation.index_status:main"
+memes-search-maintenance = "memes_search.presentation.maintenance:main"
+memes-search-migrate = "memes_search.infrastructure.migration:main"
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+
+[build-system]
+requires = ["poetry-core>=2.0,<3.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = ">=8.3,<10.0"
+pytest-asyncio = ">=0.25,<2.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib -m 'not worker_ml'"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["worker_ml: opt-in real offline model/container smoke", "integration: requires real PostgreSQL and S3", "gpu: requires an actual GPU and pinned ML weights", "acceptance: validates PRD acceptance scenarios"]

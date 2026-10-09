@@ -1,0 +1,39 @@
+[project]
+name = "memes-catalog"
+version = "0.1.0"
+description = "Memes DB catalog service"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+dependencies = ["fastapi>=0.115,<1.0", "uvicorn>=0.30,<1.0", "memes-kernel>=0.1,<0.2", "memes-platform>=0.1,<0.2", "httpx>=0.28,<0.29", "sqlalchemy[asyncio]>=2.0,<2.1", "asyncpg>=0.30,<1.0", "alembic>=1.15,<2.0", "pydantic-settings>=2.7,<3.0", "boto3>=1.36,<2.0", "mypy-boto3-s3>=1.36,<2.0", "Pillow>=11.0,<14.0"]
+
+[tool.poetry]
+packages = [{include = "memes_catalog", from = "src"}]
+
+[tool.poetry.dependencies]
+memes-kernel = {path = "../../packages/kernel", develop = true}
+memes-platform = {path = "../../packages/platform", develop = true}
+
+[project.scripts]
+memes-catalog = "memes_catalog.presentation.main:main"
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+
+[build-system]
+requires = ["poetry-core>=2.0,<3.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = ">=8.3,<10.0"
+pytest-asyncio = ">=0.25,<2.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib -m 'not worker_ml'"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["worker_ml: opt-in real offline model/container smoke", "integration: requires real PostgreSQL and S3", "gpu: requires an actual GPU and pinned ML weights", "acceptance: validates PRD acceptance scenarios"]

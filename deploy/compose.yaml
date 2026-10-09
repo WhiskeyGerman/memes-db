@@ -1,0 +1,357 @@
+name: ${MEMES_COMPOSE_PROJECT:-memes-db}
+
+x-build: &backend-build
+  context: ..
+  dockerfile: deploy/Dockerfile
+  target: backend
+  args:
+    RELEASE_ID: ${MEMES_RELEASE_ID:?Generate deploy/.env with a release id}
+
+x-environment: &environment
+  MEMES_RELEASE_ID: ${MEMES_RELEASE_ID:?Required release id}
+  MEMES_INTERNAL_API_KEY: ${MEMES_INTERNAL_API_KEY:?Required internal secret}
+  MEMES_HOST: 0.0.0.0
+  MEMES_PORT: 8080
+  MEMES_LOG_LEVEL: ${MEMES_LOG_LEVEL:-INFO}
+  MEMES_DATABASE_POOL_SIZE: ${MEMES_DATABASE_POOL_SIZE:-5}
+  MEMES_DATABASE_POOL_OVERFLOW: ${MEMES_DATABASE_POOL_OVERFLOW:-0}
+  MEMES_IDENTITY_URL: http://identity:8080
+  MEMES_CATALOG_URL: http://catalog:8080
+  MEMES_PROCESSING_URL: http://processing:8080
+  MEMES_SEARCH_URL: http://search:8080
+  MEMES_S3_ENDPOINT_URL: http://s3:8333
+  MEMES_S3_PUBLIC_ENDPOINT_URL: ${MEMES_S3_PUBLIC_ENDPOINT_URL:?Required externally reachable S3 endpoint}
+  MEMES_S3_ACCESS_KEY: ${MEMES_S3_ACCESS_KEY:?Required S3 access key}
+  MEMES_S3_SECRET_KEY: ${MEMES_S3_SECRET_KEY:?Required S3 secret}
+  MEMES_S3_BUCKET: ${MEMES_S3_BUCKET:-memes-media}
+  MEMES_JOURNAL_BUCKET: ${MEMES_JOURNAL_BUCKET:?Required separate deletion journal bucket}
+  MEMES_CSRF_ALLOWED_ORIGINS: ${MEMES_CSRF_ALLOWED_ORIGINS:?Required browser origins}
+  MEMES_CORS_ALLOWED_ORIGINS: ${MEMES_CORS_ALLOWED_ORIGINS:-[]}
+  MEMES_COOKIE_SECURE: ${MEMES_COOKIE_SECURE:-true}
+  MEMES_ALLOW_INSECURE_HTTP: ${MEMES_ALLOW_INSECURE_HTTP:-false}
+  MEMES_EMBEDDING_SPACE_ID: ${MEMES_EMBEDDING_SPACE_ID:-jina-v5-omni-nano}
+  MEMES_EMBEDDING_DIMENSIONS: ${MEMES_EMBEDDING_DIMENSIONS:-768}
+  MEMES_ACCEPTED_EMBEDDING_VERSION: ${MEMES_ACCEPTED_EMBEDDING_VERSION:?Required index embedding passport}
+
+x-process: &process
+  image: memes-db-backend:${MEMES_RELEASE_ID:?Required release id}
+  build: *backend-build
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:size=1073741824,mode=1777
+  pids_limit: 256
+  mem_limit: ${MEMES_API_MEMORY:-2g}
+  cpus: ${MEMES_API_CPUS:-2}
+  stop_grace_period: ${MEMES_STOP_GRACE_PERIOD:-35s}
+  restart: unless-stopped
+  networks: [backend]
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+  healthcheck:
+    test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/ready', timeout=5).close()"]
+    interval: 10s
+    timeout: 6s
+    retries: 5
+    start_period: 30s
+
+x-worker: &worker
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  networks: [backend]
+  extra_hosts: [host.docker.internal:host-gateway]
+  stop_grace_period: 45s
+  restart: unless-stopped
+  pids_limit: 256
+  cpus: ${MEMES_WORKER_CPUS:-4}
+  env_file:
+    - path: .env.worker
+      required: false
+  volumes:
+    - worker-cache:/var/cache/memes-worker
+  tmpfs:
+    - /tmp:size=1073741824,mode=1777
+
+x-worker-environment: &worker-environment
+  MEMES_WORKER_COORDINATOR_URL: http://processing:8080
+  MEMES_WORKER_RELEASE_ID: ${MEMES_RELEASE_ID:?Required release id}
+  MEMES_WORKER_ALLOW_INSECURE_HTTP: ${MEMES_ALLOW_INSECURE_HTTP:-false}
+  MEMES_WORKER_CACHE_DIRECTORY: /var/cache/memes-worker
+  MEMES_WORKER_MAXIMUM_PARALLEL_TASKS: ${MEMES_WORKER_MAXIMUM_PARALLEL_TASKS:-1}
+
+services:
+  frontend:
+    image: memes-db-frontend:${MEMES_RELEASE_ID:?Required release id}
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args: {RELEASE_ID: "${MEMES_RELEASE_ID:?Required release id}"}
+    environment:
+      PORT: 8080
+      MEMES_IDENTITY_URL: ${MEMES_FRONTEND_IDENTITY_URL:-http://localhost:8080}
+      MEMES_CATALOG_URL: ${MEMES_FRONTEND_CATALOG_URL:-http://localhost:8081}
+      MEMES_SEARCH_URL: ${MEMES_FRONTEND_SEARCH_URL:-http://localhost:8083}
+    ports: ["${MEMES_FRONTEND_PUBLISH_HOST:-127.0.0.1}:${MEMES_FRONTEND_PORT:-5173}:8080"]
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 128m
+    cpus: 0.5
+    tmpfs: ["/tmp:size=16777216,mode=1777"]
+    stop_grace_period: 15s
+    restart: unless-stopped
+    networks: [backend]
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 6s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      identity: {condition: service_healthy}
+      catalog: {condition: service_healthy}
+      search: {condition: service_healthy}
+
+
+  postgres:
+    image: pgvector/pgvector:pg17@sha256:ac08538c6f8b9904c33c8224c5e5706dbe760aca29db1d096972b4052c22a75d
+    environment:
+      POSTGRES_USER: memes_admin
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Required PostgreSQL admin secret}
+      IDENTITY_DATABASE_PASSWORD: ${IDENTITY_DATABASE_PASSWORD:?Required independent identity password}
+      CATALOG_DATABASE_PASSWORD: ${CATALOG_DATABASE_PASSWORD:?Required independent catalog password}
+      PROCESSING_DATABASE_PASSWORD: ${PROCESSING_DATABASE_PASSWORD:?Required independent processing password}
+      SEARCH_DATABASE_PASSWORD: ${SEARCH_DATABASE_PASSWORD:?Required independent search password}
+    command: [postgres, -c, "max_connections=${MEMES_POSTGRES_MAX_CONNECTIONS:-150}"]
+    ports: ["127.0.0.1:${MEMES_POSTGRES_PORT:-55433}:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/10-services.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U memes_admin -d postgres]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    stop_grace_period: 60s
+    restart: unless-stopped
+    networks: [backend]
+
+  s3:
+    image: chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    command: [mini, -dir=/data]
+    environment:
+      AWS_ACCESS_KEY_ID: ${MEMES_S3_ACCESS_KEY:?Required S3 access key}
+      AWS_SECRET_ACCESS_KEY: ${MEMES_S3_SECRET_KEY:?Required S3 secret}
+      S3_BUCKET: ${MEMES_S3_BUCKET:-memes-media}
+    ports: ["${MEMES_S3_PUBLISH_HOST:-0.0.0.0}:${MEMES_S3_PORT:-58334}:8333"]
+    volumes: [s3-data:/data]
+    healthcheck:
+      test: [CMD, wget, --quiet, --output-document=/dev/null, "http://127.0.0.1:9333/cluster/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    stop_grace_period: 35s
+    restart: unless-stopped
+    networks: [backend]
+
+  s3-init:
+    <<: *process
+    command: [python, /app/deploy/scripts/init_s3.py]
+    environment: *environment
+    restart: "no"
+    healthcheck: {disable: true}
+    depends_on:
+      s3: {condition: service_healthy}
+
+  migrate-identity:
+    <<: *process
+    command: [alembic, -c, services/identity/alembic.ini, upgrade, head]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_IDENTITY_DATABASE_URL:?Required identity DSN}
+    restart: "no"
+    healthcheck: {disable: true}
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  migrate-catalog:
+    <<: *process
+    command: [alembic, -c, services/catalog/alembic.ini, upgrade, head]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_CATALOG_DATABASE_URL:?Required catalog DSN}
+    restart: "no"
+    healthcheck: {disable: true}
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  migrate-processing:
+    <<: *process
+    command: [alembic, -c, services/processing/alembic.ini, upgrade, head]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_PROCESSING_DATABASE_URL:?Required processing DSN}
+    restart: "no"
+    healthcheck: {disable: true}
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  migrate-search:
+    <<: *process
+    command: [memes-search-migrate]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_SEARCH_DATABASE_URL:?Required search DSN}
+    restart: "no"
+    healthcheck: {disable: true}
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  identity:
+    <<: *process
+    command: [memes-identity]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_IDENTITY_DATABASE_URL:?Required identity DSN}
+    ports: ["${MEMES_API_PUBLISH_HOST:-127.0.0.1}:${MEMES_IDENTITY_PORT:-8080}:8080"]
+    depends_on:
+      migrate-identity: {condition: service_completed_successfully}
+      s3-init: {condition: service_completed_successfully}
+
+  catalog:
+    <<: *process
+    command: [memes-catalog]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_CATALOG_DATABASE_URL:?Required catalog DSN}
+    ports: ["${MEMES_API_PUBLISH_HOST:-127.0.0.1}:${MEMES_CATALOG_PORT:-8081}:8080"]
+    depends_on:
+      migrate-catalog: {condition: service_completed_successfully}
+      s3-init: {condition: service_completed_successfully}
+
+  processing:
+    <<: *process
+    command: [memes-processing]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_PROCESSING_DATABASE_URL:?Required processing DSN}
+    ports: ["${MEMES_API_PUBLISH_HOST:-127.0.0.1}:${MEMES_PROCESSING_PORT:-8082}:8080"]
+    depends_on:
+      migrate-processing: {condition: service_completed_successfully}
+      s3-init: {condition: service_completed_successfully}
+
+  search:
+    <<: *process
+    command: [memes-search]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_SEARCH_DATABASE_URL:?Required search DSN}
+    ports: ["${MEMES_API_PUBLISH_HOST:-127.0.0.1}:${MEMES_SEARCH_PORT:-8083}:8080"]
+    depends_on:
+      migrate-search: {condition: service_completed_successfully}
+      s3-init: {condition: service_completed_successfully}
+
+  identity-outbox:
+    <<: *process
+    command: [python, -m, memes_identity.presentation.outbox]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_IDENTITY_DATABASE_URL:?Required identity DSN}
+    healthcheck: {disable: true}
+    depends_on:
+      identity: {condition: service_healthy}
+
+  catalog-maintenance:
+    <<: *process
+    command: [python, -m, memes_catalog.presentation.maintenance]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_CATALOG_DATABASE_URL:?Required catalog DSN}
+    healthcheck: {disable: true}
+    depends_on:
+      catalog: {condition: service_healthy}
+
+  processing-coordinator:
+    <<: *process
+    command: [memes-processing-coordinator]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_PROCESSING_DATABASE_URL:?Required processing DSN}
+    healthcheck: {disable: true}
+    depends_on:
+      processing: {condition: service_healthy}
+
+  search-maintenance:
+    <<: *process
+    command: [memes-search-maintenance]
+    environment:
+      <<: *environment
+      MEMES_DATABASE_URL: ${MEMES_SEARCH_DATABASE_URL:?Required search DSN}
+    healthcheck: {disable: true}
+    depends_on:
+      search: {condition: service_healthy}
+
+  worker-preview:
+    <<: *worker
+    profiles: [worker-preview]
+    image: memes-db-worker-client:${MEMES_RELEASE_ID:?Required release id}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: worker-client
+      args: {RELEASE_ID: "${MEMES_RELEASE_ID:?Required release id}"}
+    environment:
+      <<: *worker-environment
+      MEMES_WORKER_DEVICE: cpu
+      MEMES_WORKER_OPERATIONS: preview
+    mem_limit: ${MEMES_WORKER_MEMORY:-4g}
+    depends_on:
+      processing: {condition: service_healthy}
+
+  worker-ml:
+    <<: *worker
+    profiles: [worker-ml]
+    image: memes-db-worker-ml:${MEMES_RELEASE_ID:?Required release id}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: worker-ml
+      args: {RELEASE_ID: "${MEMES_RELEASE_ID:?Required release id}"}
+    environment:
+      <<: *worker-environment
+      MEMES_WORKER_DEVICE: ${MEMES_WORKER_DEVICE:-cpu}
+      MEMES_WORKER_OPERATIONS: preview,ocr,transcript,visual_embedding,audio_embedding,text_embedding
+      MEMES_WORKER_JINA_MODEL_DIRECTORY: /models/jina
+      MEMES_WORKER_ASR_MODEL_DIRECTORY: /models/asr
+      MEMES_WORKER_OCR_DETECTION_DIRECTORY: /models/ocr/detection
+      MEMES_WORKER_OCR_RU_DIRECTORY: /models/ocr/ru
+      MEMES_WORKER_OCR_EN_DIRECTORY: /models/ocr/en
+      MEMES_WORKER_OCR_USE_GPU: "false"
+    volumes:
+      - worker-cache:/var/cache/memes-worker
+      - ${MEMES_WORKER_MODELS_DIRECTORY:-./models}:/models:ro
+    mem_limit: ${MEMES_WORKER_ML_MEMORY:-12g}
+    depends_on:
+      processing: {condition: service_healthy}
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  s3-data:
+  worker-cache:

@@ -1,0 +1,83 @@
+[project]
+name = "memes-db"
+version = "0.1.0"
+description = "Memes DB backend monorepository"
+requires-python = ">=3.11,<3.15"
+dependencies = ["memes-kernel>=0.1,<0.2", "memes-platform>=0.1,<0.2", "memes-identity>=0.1,<0.2", "memes-catalog>=0.1,<0.2", "memes-processing>=0.1,<0.2", "memes-search>=0.1,<0.2", "memes-worker>=0.1,<0.2"]
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.dependencies]
+memes-kernel = {path = "packages/kernel", develop = true}
+memes-platform = {path = "packages/platform", develop = true}
+memes-identity = {path = "services/identity", develop = true}
+memes-catalog = {path = "services/catalog", develop = true}
+memes-processing = {path = "services/processing", develop = true}
+memes-search = {path = "services/search", develop = true}
+memes-worker = {path = "services/worker", develop = true}
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.3,<10.0"
+ruff = ">=0.11,<1.0"
+mypy = ">=1.15,<2.0"
+pytest-cov = ">=6.0,<8.0"
+pytest-asyncio = ">=0.25,<2.0"
+httpx = ">=0.28,<0.29"
+argon2-cffi = ">=23.1,<26.0"
+pgvector = ">=0.4,<1.0"
+Pillow = ">=11.0,<14.0"
+python-multipart = ">=0.0.20,<1.0"
+numpy = ">=2.0,<2.3"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["packages/kernel/src", "packages/platform/src", "services/identity/src", "services/catalog/src", "services/processing/src", "services/search/src", "services/worker/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "D", "ANN", "S", "T20", "TID", "PLE", "PLW"]
+# Docstring написаны на русском языке; кириллица здесь используется намеренно.
+ignore = ["D203", "D213", "RUF002"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["deploy", "memes_*_tests", "tests"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["D", "S101"]
+"**/conftest.py" = ["D"]
+"**/__init__.py" = ["D104"]
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+files = ["packages/kernel/src", "packages/platform/src", "services/identity/src", "services/catalog/src", "services/processing/src", "services/search/src", "services/worker/src", "tests", "deploy/scripts", "packages/kernel/tests", "packages/platform/tests", "services/identity/tests", "services/catalog/tests", "services/processing/tests", "services/search/tests", "services/worker/tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "packages/kernel/tests", "packages/platform/tests", "services/identity/tests", "services/catalog/tests", "services/processing/tests", "services/search/tests", "services/worker/tests"]
+pythonpath = ["packages/kernel/tests", "packages/platform/tests", "services/identity/tests", "services/catalog/tests", "services/processing/tests", "services/search/tests", "services/worker/tests"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib -m 'not worker_ml'"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["worker_ml: opt-in real offline model/container smoke", "integration: requires real PostgreSQL and S3", "gpu: requires an actual GPU and pinned ML weights", "acceptance: validates PRD acceptance scenarios"]
+
+[tool.coverage.run]
+source = ["memes_kernel", "memes_platform", "memes_identity", "memes_catalog", "memes_processing", "memes_search", "memes_worker"]
+branch = true
+
+[build-system]
+requires = ["poetry-core>=2.0,<3.0"]
+build-backend = "poetry.core.masonry.api"
+
+[[tool.mypy.overrides]]
+module = ['paddleocr', 'faster_whisper', 'sentence_transformers', 'huggingface_hub']
+ignore_missing_imports = true

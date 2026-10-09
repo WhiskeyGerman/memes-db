@@ -1,0 +1,58 @@
+name: ${MEMES_WORKER_COMPOSE_PROJECT:-memes-db-worker}
+
+services:
+  worker:
+    image: memes-db-${MEMES_WORKER_BUILD_TARGET:-worker-ml}:${MEMES_WORKER_RELEASE_ID:?Required worker release id}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: ${MEMES_WORKER_BUILD_TARGET:-worker-ml}
+      args:
+        RELEASE_ID: ${MEMES_WORKER_RELEASE_ID:?Required worker release id}
+    env_file: ${MEMES_WORKER_ENV_FILE:-.env.worker}
+    environment:
+      MEMES_WORKER_CACHE_DIRECTORY: /var/cache/memes-worker
+      MEMES_WORKER_JINA_MODEL_DIRECTORY: /models/jina
+      MEMES_WORKER_ASR_MODEL_DIRECTORY: /models/asr
+      MEMES_WORKER_OCR_DETECTION_DIRECTORY: /models/ocr/detection
+      MEMES_WORKER_OCR_RU_DIRECTORY: /models/ocr/ru
+      MEMES_WORKER_OCR_EN_DIRECTORY: /models/ocr/en
+      MEMES_WORKER_OCR_USE_GPU: "false"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    cpus: ${MEMES_WORKER_CPUS:-4}
+    mem_limit: ${MEMES_WORKER_ML_MEMORY:-12g}
+    stop_grace_period: 45s
+    restart: unless-stopped
+    volumes:
+      - worker-cache:/var/cache/memes-worker
+      - ${MEMES_WORKER_MODELS_DIRECTORY:-./models}:/models:ro
+    tmpfs: ["/tmp:size=1073741824,mode=1777"]
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/live', timeout=5).close()"]
+      interval: 20s
+      timeout: 6s
+      retries: 3
+      start_period: 30s
+
+  prepare-models:
+    extends: {service: worker}
+    profiles: [prepare]
+    user: "0:0"
+    command: [memes-worker-prepare-model, --model, all, --directory, /models]
+    environment:
+      HF_HUB_OFFLINE: "0"
+      TRANSFORMERS_OFFLINE: "0"
+    volumes:
+      - ${MEMES_WORKER_MODELS_DIRECTORY:-./models}:/models
+    restart: "no"
+    healthcheck: {disable: true}
+
+volumes:
+  worker-cache:
