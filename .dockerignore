@@ -13,6 +13,7 @@
 **/.env.*
 deploy/models
 deploy/results
+deploy/k8s/.local
 **/tests
 htmlcov
 .coverage

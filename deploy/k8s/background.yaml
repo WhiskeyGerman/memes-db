@@ -1,0 +1,251 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-outbox
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+    app.kubernetes.io/component: background
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: identity-outbox
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: identity-outbox
+        app.kubernetes.io/part-of: memes-db
+        app.kubernetes.io/component: background
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 35
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: identity-outbox
+          image: memes-db-backend:task-02-v1
+          imagePullPolicy: Never
+          command: [python, -m, memes_identity.presentation.outbox]
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-credentials
+            - secretRef:
+                name: identity-database
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-maintenance
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+    app.kubernetes.io/component: background
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: catalog-maintenance
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: catalog-maintenance
+        app.kubernetes.io/part-of: memes-db
+        app.kubernetes.io/component: background
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 35
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: catalog-maintenance
+          image: memes-db-backend:task-02-v1
+          imagePullPolicy: Never
+          command: [python, -m, memes_catalog.presentation.maintenance]
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-credentials
+            - secretRef:
+                name: catalog-database
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: processing-coordinator
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+    app.kubernetes.io/component: background
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: processing-coordinator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: processing-coordinator
+        app.kubernetes.io/part-of: memes-db
+        app.kubernetes.io/component: background
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 35
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: processing-coordinator
+          image: memes-db-backend:task-02-v1
+          imagePullPolicy: Never
+          command: [memes-processing-coordinator]
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-credentials
+            - secretRef:
+                name: processing-database
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-maintenance
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+    app.kubernetes.io/component: background
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: search-maintenance
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: search-maintenance
+        app.kubernetes.io/part-of: memes-db
+        app.kubernetes.io/component: background
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 35
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: search-maintenance
+          image: memes-db-backend:task-02-v1
+          imagePullPolicy: Never
+          command: [memes-search-maintenance]
+          envFrom:
+            - configMapRef:
+                name: backend-config
+            - secretRef:
+                name: backend-credentials
+            - secretRef:
+                name: search-database
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

@@ -1,0 +1,188 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+data:
+  # Keep this script consistent with deploy/postgres/init-databases.sh.
+  init-databases.sh: |
+    #!/bin/sh
+    set -eu
+
+    psql --set ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
+      --set identity_password="$IDENTITY_DATABASE_PASSWORD" \
+      --set catalog_password="$CATALOG_DATABASE_PASSWORD" \
+      --set processing_password="$PROCESSING_DATABASE_PASSWORD" \
+      --set search_password="$SEARCH_DATABASE_PASSWORD" <<'SQL'
+    CREATE ROLE memes_identity LOGIN PASSWORD :'identity_password';
+    CREATE ROLE memes_catalog LOGIN PASSWORD :'catalog_password';
+    CREATE ROLE memes_processing LOGIN PASSWORD :'processing_password';
+    CREATE ROLE memes_search LOGIN PASSWORD :'search_password';
+
+    CREATE DATABASE memes_identity OWNER memes_identity;
+    CREATE DATABASE memes_catalog OWNER memes_catalog;
+    CREATE DATABASE memes_processing OWNER memes_processing;
+    CREATE DATABASE memes_search OWNER memes_search;
+
+    REVOKE ALL ON DATABASE memes_identity FROM PUBLIC;
+    REVOKE ALL ON DATABASE memes_catalog FROM PUBLIC;
+    REVOKE ALL ON DATABASE memes_processing FROM PUBLIC;
+    REVOKE ALL ON DATABASE memes_search FROM PUBLIC;
+
+    \connect memes_identity
+    REVOKE ALL ON SCHEMA public FROM PUBLIC;
+    GRANT ALL ON SCHEMA public TO memes_identity;
+
+    \connect memes_catalog
+    REVOKE ALL ON SCHEMA public FROM PUBLIC;
+    GRANT ALL ON SCHEMA public TO memes_catalog;
+
+    \connect memes_processing
+    REVOKE ALL ON SCHEMA public FROM PUBLIC;
+    GRANT ALL ON SCHEMA public TO memes_processing;
+
+    \connect memes_search
+    CREATE EXTENSION IF NOT EXISTS vector;
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    REVOKE ALL ON SCHEMA public FROM PUBLIC;
+    GRANT ALL ON SCHEMA public TO memes_search;
+    SQL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+spec:
+  serviceName: postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: memes-db
+        app.kubernetes.io/component: database
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg17@sha256:ac08538c6f8b9904c33c8224c5e5706dbe760aca29db1d096972b4052c22a75d
+          imagePullPolicy: IfNotPresent
+          args:
+            - postgres
+            - -c
+            - max_connections=60
+            - -c
+            - shared_buffers=64MB
+            - -c
+            - work_mem=2MB
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          env:
+            - name: POSTGRES_USER
+              value: memes_admin
+            - name: POSTGRES_DB
+              value: postgres
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          startupProbe:
+            exec:
+              command: [pg_isready, -h, 127.0.0.1, -U, memes_admin, -d, postgres]
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command: [pg_isready, -h, 127.0.0.1, -U, memes_admin, -d, postgres]
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command: [pg_isready, -h, 127.0.0.1, -U, memes_admin, -d, postgres]
+            periodSeconds: 10
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+            - name: socket
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+        - name: socket
+          emptyDir:
+            sizeLimit: 16Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 2Gi

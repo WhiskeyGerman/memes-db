@@ -1,0 +1,144 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3-headless
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: s3
+  ports:
+    - name: s3
+      port: 8333
+      targetPort: s3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+spec:
+  selector:
+    app.kubernetes.io/name: s3
+  ports:
+    - name: s3
+      port: 8333
+      targetPort: s3
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: s3
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+spec:
+  serviceName: s3-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s3
+        app.kubernetes.io/part-of: memes-db
+        app.kubernetes.io/component: storage
+    spec:
+      automountServiceAccountToken: false
+      # SeaweedFS читает S3_PORT как число; Service links задают tcp://host:port.
+      # Обращения к Services используют DNS и не зависят от этих переменных.
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 35
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: s3
+          image: chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+          imagePullPolicy: IfNotPresent
+          command: [/usr/bin/weed]
+          args:
+            - -logtostderr=true
+            - mini
+            - -dir=/data
+            - -master.volumeSizeLimitMB=128
+            - -s3.allowedOrigins=http://localhost:5173
+          env:
+            - name: HOME
+              value: /tmp
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: MEMES_S3_BUCKET
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backend-credentials
+                  key: MEMES_S3_ACCESS_KEY
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-credentials
+                  key: MEMES_S3_SECRET_KEY
+          ports:
+            - name: s3
+              containerPort: 8333
+            - name: master
+              containerPort: 9333
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          startupProbe:
+            httpGet:
+              path: /cluster/status
+              port: master
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: s3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /cluster/status
+              port: master
+            periodSeconds: 10
+            timeoutSeconds: 3
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 2Gi

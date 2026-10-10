@@ -18,3 +18,4 @@
 **/.env.*
 !**/.env.example
 !**/.env.worker.example
+deploy/k8s/.local/

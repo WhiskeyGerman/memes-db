@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+data:
+  MEMES_RELEASE_ID: task-02-v1
+  MEMES_HOST: 0.0.0.0
+  MEMES_PORT: "8080"
+  MEMES_LOG_LEVEL: INFO
+  MEMES_DATABASE_POOL_SIZE: "2"
+  MEMES_DATABASE_POOL_OVERFLOW: "0"
+  MEMES_IDENTITY_URL: http://identity:8080
+  MEMES_CATALOG_URL: http://catalog:8080
+  MEMES_PROCESSING_URL: http://processing:8080
+  MEMES_SEARCH_URL: http://search:8080
+  MEMES_S3_ENDPOINT_URL: http://s3:8333
+  MEMES_S3_PUBLIC_ENDPOINT_URL: http://localhost:5173
+  MEMES_S3_REGION: us-east-1
+  MEMES_S3_BUCKET: memes-media
+  MEMES_JOURNAL_BUCKET: memes-deletion-journal
+  MEMES_CSRF_ALLOWED_ORIGINS: '["http://localhost:5173"]'
+  MEMES_CORS_ALLOWED_ORIGINS: '["http://localhost:5173"]'
+  MEMES_COOKIE_SECURE: "false"
+  MEMES_ALLOW_INSECURE_HTTP: "true"
+  MEMES_CONCURRENT_UPLOADS: "1"
+  MEMES_INSPECTION_CONCURRENCY: "1"
+  MEMES_EMBEDDING_SPACE_ID: jina-v5-omni-nano
+  MEMES_EMBEDDING_DIMENSIONS: "768"
+  MEMES_ACCEPTED_EMBEDDING_VERSION: >-
+    {"model":"jinaai/jina-embeddings-v5-omni-nano","weights":"009e0d09a98a82227526e8c5aa7b0aa282e36163","task_adapter":"retrieval-v1","preprocessing":"ffmpeg-sampling-v1","space":"jina-v5-omni-nano","dimensions":768}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+data:
+  PORT: "8080"
+  MEMES_IDENTITY_URL: http://localhost:5173
+  MEMES_CATALOG_URL: http://localhost:5173
+  MEMES_SEARCH_URL: http://localhost:5173
