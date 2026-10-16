@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from memes_kernel.values import Number
 from memes_platform.infrastructure.database import create_engine, session_factory
 from memes_platform.infrastructure.http import InternalHttpClient
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import LogField, ServiceName, configure_logging
 from memes_search.application.dto.delivery import DeliveryPolicy, MaintenanceResult
 from memes_search.application.dto.sessions import SearchSessionPolicy
 from memes_search.application.use_cases.maintenance import SearchMaintenance
@@ -44,7 +44,12 @@ async def drain(
 async def run() -> None:
     """Выполнить отдельный disposability-процесс с сигналом остановки."""
     settings = Settings()
-    configure_logging(level=settings.log_level, release_id=settings.release_id)
+    configure_logging(
+        level=settings.log_level,
+        release_id=settings.release_id,
+        service_name=ServiceName.SEARCH_MAINTENANCE,
+        environment=settings.deployment_environment,
+    )
     engine = create_engine(
         settings.database_url,
         pool_size=settings.database_pool_size,
@@ -107,12 +112,14 @@ async def run() -> None:
                 delivered, cleaned = await drain(maintenance, stop)
                 if delivered.failed or cleaned.failed:
                     logger.warning(
-                        "search_maintenance_retry delivery=%d cleanup=%d",
-                        delivered.failed,
-                        cleaned.failed,
+                        "search_maintenance_retry",
+                        extra={
+                            LogField.RETRIED_DELIVERIES: delivered.failed,
+                            LogField.RETRIED_CLEANUPS: cleaned.failed,
+                        },
                     )
-            except SQLAlchemyError:
-                logger.warning("search_maintenance_database_unavailable")
+            except (SQLAlchemyError, OSError, TimeoutError):
+                logger.warning("search_maintenance_database_unavailable", exc_info=True)
             if delivered.continue_immediately:
                 await asyncio.sleep(Number.ZERO)
                 continue

@@ -10,7 +10,7 @@ from memes_catalog.application.dto.catalog import CatalogDefault, SearchIndexTar
 from memes_catalog.infrastructure.configuration import CatalogSettings
 from memes_catalog.presentation.main import build_container, close_container
 from memes_platform.infrastructure.database import create_engine
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import ServiceName, configure_logging
 
 
 class AdminCommand(StrEnum):
@@ -32,7 +32,12 @@ async def execute(command: AdminCommand, since: datetime | None, target: SearchI
         target: Индекс для административного построения.
     """
     settings = CatalogSettings()
-    configure_logging(level=settings.log_level, release_id=settings.release_id)
+    configure_logging(
+        level=settings.log_level,
+        release_id=settings.release_id,
+        service_name=ServiceName.CATALOG,
+        environment=settings.deployment_environment,
+    )
     engine = create_engine(
         settings.database_url,
         pool_size=settings.database_pool_size,

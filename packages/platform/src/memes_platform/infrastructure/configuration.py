@@ -22,6 +22,7 @@ class RuntimeText(StrEnum):
     PREFIX = "MEMES_"
     HOST = "0.0.0.0"  # noqa: S104 - port binding управляется окружением.
     LOG_LEVEL = "INFO"
+    ENVIRONMENT = "development"
     POSTGRES_SCHEME = "postgresql+asyncpg://"
 
 
@@ -42,6 +43,7 @@ class BaseServiceSettings(BaseSettings):
     host: str = RuntimeText.HOST
     port: int = Field(default=RuntimeDefault.HTTP_PORT, ge=1, le=65535)
     log_level: str = RuntimeText.LOG_LEVEL
+    deployment_environment: str = Field(default=RuntimeText.ENVIRONMENT, min_length=1)
     identity_url: str = ""
     catalog_url: str = ""
     processing_url: str = ""

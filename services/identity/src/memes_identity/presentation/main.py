@@ -31,7 +31,7 @@ from memes_kernel.values import Number
 from memes_platform.application.errors import ApplicationError
 from memes_platform.infrastructure.database import create_engine, session_factory
 from memes_platform.infrastructure.deletion_journal import S3DeletionJournal
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import ServiceName, configure_logging
 from memes_platform.infrastructure.metrics import PostgreSQLMetrics
 from memes_platform.presentation.body_limit import RequestBodyLimitMiddleware
 from memes_platform.presentation.cors import install_cors
@@ -75,7 +75,12 @@ def create_app(settings: IdentitySettings | None = None) -> FastAPI:
         configuration = settings or IdentitySettings()
         configuration.require_http_configuration()
         configuration.require_outbox_configuration()
-        configure_logging(level=configuration.log_level, release_id=configuration.release_id)
+        configure_logging(
+            level=configuration.log_level,
+            release_id=configuration.release_id,
+            service_name=ServiceName.IDENTITY,
+            environment=configuration.deployment_environment,
+        )
         engine = create_engine(
             configuration.database_url,
             pool_size=configuration.database_pool_size,

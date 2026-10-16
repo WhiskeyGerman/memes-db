@@ -15,7 +15,7 @@ from memes_catalog.infrastructure.persistence.outbox import PostgresOutbox
 from memes_catalog.presentation.main import build_container, close_container
 from memes_platform.application.errors import ApplicationError
 from memes_platform.infrastructure.database import create_engine, session_factory
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import ServiceName, configure_logging
 from memes_platform.presentation.process import graceful_batch
 
 
@@ -35,7 +35,12 @@ async def run(settings: CatalogSettings) -> None:
     Args:
         settings: Окружение конкретного релиза.
     """
-    configure_logging(level=settings.log_level, release_id=settings.release_id)
+    configure_logging(
+        level=settings.log_level,
+        release_id=settings.release_id,
+        service_name=ServiceName.CATALOG_MAINTENANCE,
+        environment=settings.deployment_environment,
+    )
     engine = create_engine(
         settings.database_url,
         pool_size=settings.database_pool_size,
@@ -72,7 +77,7 @@ async def run(settings: CatalogSettings) -> None:
                 if cleaned or delivered:
                     continue
             except (ApplicationError, DBAPIError, SQLTimeoutError, OSError):
-                logger.warning(ProcessEvent.RETRY)
+                logger.warning(ProcessEvent.RETRY, exc_info=True)
             try:
                 await asyncio.wait_for(
                     stopping.wait(), timeout=settings.maintenance_interval_seconds

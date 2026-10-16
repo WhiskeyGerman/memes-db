@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: bootstrap
-          image: memes-db-backend:task-02-v1
+          image: memes-db-backend:task-03-v2
           imagePullPolicy: Never
           command: [/bin/sh, -c]
           args:

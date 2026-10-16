@@ -1,0 +1,17 @@
+groups:
+  - name: memes-db-http
+    type: vlogs
+    interval: 10s
+    rules:
+      - alert: MemesDbServerErrors
+        expr: >-
+          _time:1m {deployment.environment.name="minikube"}
+          event.name:=http_request_completed status:~"^5[0-9]{2}$"
+          | stats by (service.name) count() as errors
+          | filter errors:>0
+        for: 10s
+        labels:
+          severity: warning
+        annotations:
+          summary: 'HTTP 5xx в сервисе {{ index .Labels "service.name" }}'
+          description: 'За последнюю минуту зарегистрировано серверных ошибок: {{ $value }}.'

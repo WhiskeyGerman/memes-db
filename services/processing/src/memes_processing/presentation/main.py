@@ -20,7 +20,7 @@ from pydantic import JsonValue
 from memes_kernel.errors import DomainError
 from memes_kernel.values import FileRef, Sha256
 from memes_platform.infrastructure.database import create_engine, session_factory
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import ServiceName, configure_logging
 from memes_platform.infrastructure.metrics import PostgreSQLMetrics
 from memes_platform.presentation.body_limit import RequestBodyLimitMiddleware
 from memes_platform.presentation.cors import install_cors
@@ -134,7 +134,12 @@ def create_app(settings: ProcessingSettings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        configure_logging(level=configured.log_level, release_id=configured.release_id)
+        configure_logging(
+            level=configured.log_level,
+            release_id=configured.release_id,
+            service_name=ServiceName.PROCESSING,
+            environment=configured.deployment_environment,
+        )
         engine = create_engine(
             configured.database_url,
             pool_size=configured.database_pool_size,

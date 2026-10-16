@@ -15,7 +15,7 @@ from memes_identity.infrastructure.clock import SystemClock
 from memes_identity.infrastructure.configuration import IdentitySettings
 from memes_identity.infrastructure.persistence.unit_of_work import SqlIdentityUnitOfWork
 from memes_platform.infrastructure.database import create_engine, session_factory
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import ServiceName, configure_logging
 
 
 class OutboxEvent(StrEnum):
@@ -36,7 +36,12 @@ async def run(settings: IdentitySettings) -> None:
         settings: Конфигурация текущего релиза.
     """
     settings.require_outbox_configuration()
-    configure_logging(level=settings.log_level, release_id=settings.release_id)
+    configure_logging(
+        level=settings.log_level,
+        release_id=settings.release_id,
+        service_name=ServiceName.IDENTITY_OUTBOX,
+        environment=settings.deployment_environment,
+    )
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for signum in (signal.SIGTERM, signal.SIGINT):
@@ -62,9 +67,9 @@ async def run(settings: IdentitySettings) -> None:
                 )
                 try:
                     found = await use_case.execute()
-                except (DBAPIError, SqlTimeoutError):
+                except (DBAPIError, SqlTimeoutError, OSError):
                     found = False
-                    logger.warning(OutboxEvent.DATABASE_RETRY)
+                    logger.warning(OutboxEvent.DATABASE_RETRY, exc_info=True)
                 if not found:
                     try:
                         await asyncio.wait_for(stop.wait(), timeout=settings.outbox_poll_seconds)

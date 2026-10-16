@@ -47,7 +47,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: identity
-          image: memes-db-backend:task-02-v1
+          image: memes-db-backend:task-03-v2
           imagePullPolicy: Never
           command: [memes-identity]
           envFrom:
@@ -148,7 +148,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: catalog
-          image: memes-db-backend:task-02-v1
+          image: memes-db-backend:task-03-v2
           imagePullPolicy: Never
           command: [memes-catalog]
           envFrom:
@@ -249,7 +249,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: processing
-          image: memes-db-backend:task-02-v1
+          image: memes-db-backend:task-03-v2
           imagePullPolicy: Never
           command: [memes-processing]
           envFrom:
@@ -350,7 +350,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: search
-          image: memes-db-backend:task-02-v1
+          image: memes-db-backend:task-03-v2
           imagePullPolicy: Never
           command: [memes-search]
           envFrom:

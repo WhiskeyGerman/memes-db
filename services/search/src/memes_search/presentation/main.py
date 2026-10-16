@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import ServiceName, configure_logging
 from memes_platform.infrastructure.metrics import PostgreSQLMetrics
 from memes_platform.presentation.cors import install_cors
 from memes_platform.presentation.observability import install_observability
@@ -42,7 +42,12 @@ class LivenessResponse(BaseModel):
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     """Создать внешние подключения и закрыть их при остановке."""
     settings = Settings()
-    configure_logging(level=settings.log_level, release_id=settings.release_id)
+    configure_logging(
+        level=settings.log_level,
+        release_id=settings.release_id,
+        service_name=ServiceName.SEARCH,
+        environment=settings.deployment_environment,
+    )
     application.state.settings = settings
     runtime = create_runtime(settings)
     application.state.runtime = runtime
@@ -107,7 +112,12 @@ async def search_error_handler(request: Request, error: Exception) -> JSONRespon
 def main() -> None:
     """Запустить самостоятельный HTTP-процесс по конфигурации окружения."""
     settings = Settings()
-    configure_logging(level=settings.log_level, release_id=settings.release_id)
+    configure_logging(
+        level=settings.log_level,
+        release_id=settings.release_id,
+        service_name=ServiceName.SEARCH,
+        environment=settings.deployment_environment,
+    )
     uvicorn.run(
         SearchText.IMPORT_PATH,
         host=settings.host,

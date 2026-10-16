@@ -13,7 +13,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy.exc import DBAPIError
 
 from memes_platform.infrastructure.database import create_engine, session_factory
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import LogField, ServiceName, configure_logging
 from memes_processing.application.dto.coordinator import CoordinatorLimit
 from memes_processing.application.dto.features import integer, sequence
 from memes_processing.application.ports.external import IArtifactStorage, IEventDelivery
@@ -30,7 +30,7 @@ from memes_processing.infrastructure.storage.s3 import S3Artifacts
 class ProcessLog(StrEnum):
     """Санитизированные события технического процесса."""
 
-    DELIVERY_RETRY = "processing_delivery_retry event=%s"
+    DELIVERY_RETRY = "processing_delivery_retry"
     DATABASE_RETRY = "processing_database_retry"
 
 
@@ -82,7 +82,7 @@ async def deliver_batch(
         processed = integer(delivered.get("processed"))
         completed += processed - len(retried)
         for event_id in retried:
-            logger.warning(ProcessLog.DELIVERY_RETRY, event_id)
+            logger.warning(ProcessLog.DELIVERY_RETRY, extra={LogField.EVENT_ID: str(event_id)})
         steps += 1
         if not cleaned and not processed:
             break
@@ -92,7 +92,12 @@ async def deliver_batch(
 async def run() -> None:
     """Доставлять события и возвращать потерянные lease в очередь."""
     settings = ProcessingSettings()
-    configure_logging(level=settings.log_level, release_id=settings.release_id)
+    configure_logging(
+        level=settings.log_level,
+        release_id=settings.release_id,
+        service_name=ServiceName.PROCESSING_COORDINATOR,
+        environment=settings.deployment_environment,
+    )
     engine = create_engine(
         settings.database_url,
         pool_size=settings.database_pool_size,
@@ -129,8 +134,8 @@ async def run() -> None:
                     if batch.should_continue:
                         await asyncio.sleep(0)
                         continue
-                except (DBAPIError, BotoCoreError, ClientError):
-                    logger.warning(ProcessLog.DATABASE_RETRY)
+                except (DBAPIError, BotoCoreError, ClientError, OSError, TimeoutError):
+                    logger.warning(ProcessLog.DATABASE_RETRY, exc_info=True)
                 try:
                     await asyncio.wait_for(stopped.wait(), timeout=settings.outbox_interval_seconds)
                 except TimeoutError:

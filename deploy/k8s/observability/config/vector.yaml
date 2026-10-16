@@ -1,0 +1,56 @@
+data_dir: /var/lib/vector
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+sources:
+  application:
+    type: kubernetes_logs
+    self_node_name: ${VECTOR_SELF_NODE_NAME}
+    extra_field_selector: metadata.namespace=memes-db
+    extra_label_selector: app.kubernetes.io/part-of=memes-db,app.kubernetes.io/component in (api,background,frontend)
+    auto_partial_merge: true
+transforms:
+  structured:
+    type: remap
+    inputs: [application]
+    drop_on_error: true
+    drop_on_abort: true
+    source: |
+      metadata = .kubernetes
+      parsed = parse_json!(string!(.message))
+      . = object!(parsed)
+      .timestamp = parse_timestamp!(string!(.timestamp), format: "%+")
+      ."service.name" = string!(."service.name")
+      ."k8s.namespace.name" = metadata.pod_namespace
+      ."k8s.pod.name" = metadata.pod_name
+      ."k8s.container.name" = metadata.container_name
+      ."k8s.node.name" = metadata.pod_node_name
+      del(.password)
+      del(.token)
+      del(.authorization)
+      del(.cookie)
+      del(.headers)
+      del(.body)
+sinks:
+  victorialogs:
+    type: http
+    inputs: [structured]
+    uri: http://victorialogs:9428/insert/jsonline?_stream_fields=service.name,deployment.environment.name,k8s.namespace.name&_msg_field=message&_time_field=timestamp
+    method: post
+    compression: gzip
+    encoding:
+      codec: json
+    framing:
+      method: newline_delimited
+    batch:
+      max_bytes: 1048576
+      timeout_secs: 1
+    buffer:
+      type: disk
+      max_size: 536870912
+      when_full: block
+    request:
+      timeout_secs: 10
+    healthcheck:
+      enabled: true
+      uri: http://victorialogs:9428/health

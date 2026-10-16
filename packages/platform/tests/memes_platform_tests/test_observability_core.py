@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 
 from memes_platform.infrastructure.correlation import request_id
-from memes_platform.infrastructure.logging import JsonFormatter
+from memes_platform.infrastructure.logging import JsonFormatter, ServiceName
 from memes_platform.presentation.body_limit import RequestBodyLimitMiddleware, RequestLimit
 from memes_platform.presentation.observability import install_observability
 
@@ -59,7 +59,7 @@ async def test_chunked_body_is_rejected_without_content_length(
         response = await client.post(
             "/consume", content=chunks(), headers={"Content-Type": "application/json"}
         )
-    assert response.status_code == 413
+    assert response.status_code == HTTPStatus.REQUEST_ENTITY_TOO_LARGE
 
 
 def test_log_formatter_includes_correlation_without_url_or_payload() -> None:
@@ -70,7 +70,9 @@ def test_log_formatter_includes_correlation_without_url_or_payload() -> None:
         record.__dict__["task_id"] = str(uuid4())
         secret = uuid4().hex
         record.__dict__["token"] = secret
-        formatted = JsonFormatter("fixture-release").format(record)
+        formatted = JsonFormatter(
+            "fixture-release", service_name=ServiceName.IDENTITY, environment="test"
+        ).format(record)
     finally:
         request_id.reset(context)
     assert identifier in formatted

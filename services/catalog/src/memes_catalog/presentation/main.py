@@ -28,7 +28,7 @@ from memes_platform.application.errors import ApplicationError, ErrorCode
 from memes_platform.infrastructure.database import create_engine, session_factory
 from memes_platform.infrastructure.deletion_journal import S3DeletionJournal
 from memes_platform.infrastructure.http import InternalHttpClient
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import ServiceName, configure_logging
 from memes_platform.infrastructure.metrics import PostgreSQLMetrics
 from memes_platform.presentation.body_limit import RequestBodyLimitMiddleware
 from memes_platform.presentation.cors import install_cors
@@ -147,7 +147,12 @@ def create_app(settings: CatalogSettings | None = None) -> FastAPI:
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         """Создать ресурсы и гарантировать graceful shutdown."""
         configuration = settings or CatalogSettings()
-        configure_logging(level=configuration.log_level, release_id=configuration.release_id)
+        configure_logging(
+            level=configuration.log_level,
+            release_id=configuration.release_id,
+            service_name=ServiceName.CATALOG,
+            environment=configuration.deployment_environment,
+        )
         engine = create_engine(
             configuration.database_url,
             pool_size=configuration.database_pool_size,

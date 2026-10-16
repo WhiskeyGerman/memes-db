@@ -26,7 +26,7 @@ from memes_identity.infrastructure.persistence.maintenance import SqlIdentityMai
 from memes_identity.infrastructure.persistence.unit_of_work import SqlIdentityUnitOfWork
 from memes_platform.infrastructure.database import create_engine, session_factory
 from memes_platform.infrastructure.deletion_journal import S3DeletionJournal
-from memes_platform.infrastructure.logging import configure_logging
+from memes_platform.infrastructure.logging import ServiceName, configure_logging
 
 
 class AdminCommand(StrEnum):
@@ -62,7 +62,12 @@ async def execute(
         login: Логин оператора.
         password: Исходный пароль для создания оператора.
     """
-    configure_logging(level=settings.log_level, release_id=settings.release_id)
+    configure_logging(
+        level=settings.log_level,
+        release_id=settings.release_id,
+        service_name=ServiceName.IDENTITY,
+        environment=settings.deployment_environment,
+    )
     engine = create_engine(settings.database_url)
     factory = session_factory(engine)
     try:
