@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 import httpx
 import pytest
 from fastapi import FastAPI
+from prometheus_client.parser import text_string_to_metric_families
 
 from memes_platform.infrastructure.correlation import request_id
 from memes_platform.infrastructure.logging import JsonFormatter, ServiceName
@@ -24,6 +25,23 @@ def observed_application() -> FastAPI:
 
 async def consume_payload(body: dict[str, str]) -> dict[str, str]:
     return body
+
+
+async def test_runtime_collectors_export_valid_openmetrics(observed_application: FastAPI) -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=observed_application), base_url="http://fixture"
+    ) as client:
+        response = await client.get("/metrics")
+    assert response.status_code == HTTPStatus.OK
+    assert response.headers["content-type"].startswith("application/openmetrics-text")
+    families = {family.name: family for family in text_string_to_metric_families(response.text)}
+    assert families["python_info"].samples[0].value == 1
+    assert any(
+        sample.name == "python_gc_collections_total"
+        for family in families.values()
+        for sample in family.samples
+    )
+    assert response.text.endswith("# EOF\n")
 
 
 async def test_request_correlation_and_unmatched_route_have_no_private_labels(

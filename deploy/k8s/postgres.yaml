@@ -96,6 +96,10 @@ spec:
       app.kubernetes.io/name: postgres
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: /metrics
       labels:
         app.kubernetes.io/name: postgres
         app.kubernetes.io/part-of: memes-db
@@ -167,6 +171,49 @@ spec:
               mountPath: /var/run/postgresql
             - name: tmp
               mountPath: /tmp
+        - name: postgres-exporter
+          image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DATA_SOURCE_URI
+              value: 127.0.0.1:5432/postgres?sslmode=disable
+            - name: DATA_SOURCE_USER
+              value: postgres_exporter
+            - name: DATA_SOURCE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-exporter
+                  key: password
+          ports:
+            - name: metrics
+              containerPort: 9187
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: metrics
+            periodSeconds: 15
+            timeoutSeconds: 5
       volumes:
         - name: init
           configMap:

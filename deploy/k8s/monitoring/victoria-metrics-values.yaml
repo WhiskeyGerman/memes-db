@@ -1,0 +1,16 @@
+server:
+  fullnameOverride: victoria-metrics
+  retentionPeriod: 7d
+  persistentVolume:
+    enabled: true
+    storageClassName: standard
+    size: 2Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  scrape:
+    enabled: false

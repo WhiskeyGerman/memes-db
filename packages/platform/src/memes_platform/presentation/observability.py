@@ -12,13 +12,16 @@ from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Request
 from prometheus_client import (
-    CONTENT_TYPE_LATEST,
     CollectorRegistry,
     Counter,
     Gauge,
+    GCCollector,
     Histogram,
-    generate_latest,
+    PlatformCollector,
+    ProcessCollector,
 )
+from prometheus_client.exposition import choose_encoder
+from prometheus_client.openmetrics.exposition import CONTENT_TYPE_LATEST
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.datastructures import MutableHeaders
 from starlette.responses import Response
@@ -61,6 +64,9 @@ class MetricsState:
 
     def __post_init__(self) -> None:
         """Создать фиксированные метрики без ID пользователей и объектов."""
+        GCCollector(registry=self.registry)
+        PlatformCollector(registry=self.registry)
+        ProcessCollector(registry=self.registry)
         self.requests = Counter(
             MetricSetting.REQUESTS,
             "HTTP requests",
@@ -193,6 +199,7 @@ class ObservabilityMiddleware:
 async def metrics(request: Request) -> Response:
     """Экспортировать агрегаты без секретов; доступ ограничивается сетью ingress."""
     state = cast(MetricsState, request.app.state.observability)
+    encode, content_type = choose_encoder(CONTENT_TYPE_LATEST)
     if state.provider is not None:
         try:
             for sample in await state.provider.snapshot():
@@ -202,11 +209,11 @@ async def metrics(request: Request) -> Response:
             state.dependency.labels(state.service).set(0)
             logger.warning("metrics_dependency_unavailable", exc_info=True)
             return Response(
-                generate_latest(state.registry),
-                media_type=CONTENT_TYPE_LATEST,
+                encode(state.registry),
+                media_type=content_type,
                 status_code=HTTPStatus.SERVICE_UNAVAILABLE,
             )
-    return Response(generate_latest(state.registry), media_type=CONTENT_TYPE_LATEST)
+    return Response(encode(state.registry), media_type=content_type)
 
 
 def install_observability(application: FastAPI, *, service: str) -> MetricsState:

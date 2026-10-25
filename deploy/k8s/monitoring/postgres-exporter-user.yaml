@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-exporter-user
+  namespace: memes-db
+  labels:
+    app.kubernetes.io/part-of: memes-db
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: memes-db
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: setup
+          image: pgvector/pgvector:pg17@sha256:ac08538c6f8b9904c33c8224c5e5706dbe760aca29db1d096972b4052c22a75d
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              psql --set ON_ERROR_STOP=1 <<'SQL'
+              \getenv exporter_password EXPORTER_PASSWORD
+              SELECT 'CREATE ROLE postgres_exporter LOGIN'
+                WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'postgres_exporter') \gexec
+              ALTER ROLE postgres_exporter PASSWORD :'exporter_password';
+              GRANT pg_monitor TO postgres_exporter;
+              GRANT CONNECT ON DATABASE postgres TO postgres_exporter;
+              SQL
+          env:
+            - name: PGHOST
+              value: postgres
+            - name: PGDATABASE
+              value: postgres
+            - name: PGUSER
+              value: memes_admin
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: EXPORTER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-exporter
+                  key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 64Mi

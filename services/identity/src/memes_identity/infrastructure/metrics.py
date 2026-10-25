@@ -8,6 +8,8 @@ from memes_platform.application.dto.metrics import MetricName
 class MetricQuery(StrEnum):
     """Фиксированный SQL без пользовательских значений."""
 
+    USERS_ACTIVE = "SELECT count(*) FROM identity_users WHERE state='active'"
+
     OUTBOX_PENDING = "SELECT count(*) FROM identity_outbox WHERE delivered_at IS NULL"
 
     OUTBOX_OLDEST = (

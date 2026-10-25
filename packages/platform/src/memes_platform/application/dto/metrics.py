@@ -5,8 +5,12 @@ from enum import StrEnum
 
 
 class MetricName(StrEnum):
-    """Стабильные эксплуатационные показатели."""
+    """Стабильные эксплуатационные и бизнес-показатели."""
 
+    USERS_ACTIVE = "memes_users_active"
+    MEDIA_PUBLISHED = "memes_media_published"
+    GROUPS_ACTIVE = "memes_groups_active"
+    BALLOTS_OPEN = "memes_ballots_open"
     QUEUE_PENDING = "memes_queue_pending"
     QUEUE_OLDEST = "memes_queue_oldest_seconds"
     WORKERS_ONLINE = "memes_workers_online"

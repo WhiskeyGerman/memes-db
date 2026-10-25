@@ -31,6 +31,10 @@ spec:
       app.kubernetes.io/name: identity
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
       labels:
         app.kubernetes.io/name: identity
         app.kubernetes.io/part-of: memes-db
@@ -47,7 +51,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: identity
-          image: memes-db-backend:task-03-v2
+          image: memes-db-backend:task-04-v1
           imagePullPolicy: Never
           command: [memes-identity]
           envFrom:
@@ -132,6 +136,10 @@ spec:
       app.kubernetes.io/name: catalog
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
       labels:
         app.kubernetes.io/name: catalog
         app.kubernetes.io/part-of: memes-db
@@ -148,7 +156,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: catalog
-          image: memes-db-backend:task-03-v2
+          image: memes-db-backend:task-04-v1
           imagePullPolicy: Never
           command: [memes-catalog]
           envFrom:
@@ -233,6 +241,10 @@ spec:
       app.kubernetes.io/name: processing
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
       labels:
         app.kubernetes.io/name: processing
         app.kubernetes.io/part-of: memes-db
@@ -249,7 +261,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: processing
-          image: memes-db-backend:task-03-v2
+          image: memes-db-backend:task-04-v1
           imagePullPolicy: Never
           command: [memes-processing]
           envFrom:
@@ -334,6 +346,10 @@ spec:
       app.kubernetes.io/name: search
   template:
     metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
       labels:
         app.kubernetes.io/name: search
         app.kubernetes.io/part-of: memes-db
@@ -350,7 +366,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: search
-          image: memes-db-backend:task-03-v2
+          image: memes-db-backend:task-04-v1
           imagePullPolicy: Never
           command: [memes-search]
           envFrom:
