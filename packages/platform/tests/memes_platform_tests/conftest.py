@@ -29,6 +29,10 @@ from memes_platform_tests.logging_fixtures import (
 from memes_platform_tests.logging_fixtures import (
     validation_exception_record as validation_exception_record,
 )
+from memes_platform_tests.observability_fixtures import metrics_failure as metrics_failure
+from memes_platform_tests.observability_fixtures import metrics_provider as metrics_provider
+from memes_platform_tests.observability_fixtures import metrics_state as metrics_state
+from memes_platform_tests.observability_fixtures import observed_application as observed_application
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:

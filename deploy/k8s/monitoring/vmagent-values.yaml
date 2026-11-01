@@ -45,3 +45,19 @@ config:
           target_label: pod
         - source_labels: [__meta_kubernetes_pod_container_name]
           target_label: container
+    - job_name: memes-db-probe
+      metrics_path: /probe
+      params:
+        module: [catalog_feed]
+      static_configs:
+        - targets:
+            - http://memes-db-gateway.envoy-gateway-system.svc:80/v1/media?limit=1
+          labels:
+            scenario: catalog-feed
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: __param_target
+        - source_labels: [__param_target]
+          target_label: instance
+        - target_label: __address__
+          replacement: blackbox-exporter.monitoring.svc:9115

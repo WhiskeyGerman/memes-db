@@ -1,6 +1,17 @@
 server:
   fullnameOverride: victoria-metrics
-  retentionPeriod: 7d
+  retentionPeriod: 35d
+  extraArgs:
+    vmui.customDashboardsPath: /etc/vm/dashboards
+    search.maxPointsSubqueryPerTimeseries: "200000"
+  extraVolumes:
+    - name: sli-dashboards
+      configMap:
+        name: memes-db-sli-dashboards
+  extraVolumeMounts:
+    - name: sli-dashboards
+      mountPath: /etc/vm/dashboards
+      readOnly: true
   persistentVolume:
     enabled: true
     storageClassName: standard

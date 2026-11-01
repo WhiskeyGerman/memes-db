@@ -6,7 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: memes-db
 data:
-  MEMES_RELEASE_ID: task-04-v1
+  MEMES_RELEASE_ID: task-05-v1
   MEMES_HOST: 0.0.0.0
   MEMES_PORT: "8080"
   MEMES_LOG_LEVEL: INFO

@@ -4,27 +4,16 @@ from http import HTTPStatus
 from uuid import UUID, uuid4
 
 import httpx
-import pytest
 from fastapi import FastAPI
 from prometheus_client.parser import text_string_to_metric_families
+from sqlalchemy.exc import SQLAlchemyError
 
+from memes_platform.application.dto.metrics import MetricName
 from memes_platform.infrastructure.correlation import request_id
 from memes_platform.infrastructure.logging import JsonFormatter, ServiceName
-from memes_platform.presentation.body_limit import RequestBodyLimitMiddleware, RequestLimit
-from memes_platform.presentation.observability import install_observability
-
-
-@pytest.fixture
-def observed_application() -> FastAPI:
-    application = FastAPI()
-    install_observability(application, service="fixture")
-    application.add_middleware(RequestBodyLimitMiddleware)
-    application.add_api_route("/consume", consume_payload, methods=["POST"])
-    return application
-
-
-async def consume_payload(body: dict[str, str]) -> dict[str, str]:
-    return body
+from memes_platform.presentation.body_limit import RequestLimit
+from memes_platform.presentation.observability import MetricSetting
+from memes_platform_tests.observability_fixtures import MetricsProviderFixture
 
 
 async def test_runtime_collectors_export_valid_openmetrics(observed_application: FastAPI) -> None:
@@ -42,6 +31,48 @@ async def test_runtime_collectors_export_valid_openmetrics(observed_application:
         for sample in family.samples
     )
     assert response.text.endswith("# EOF\n")
+
+
+async def test_dependency_failure_preserves_http_metrics_and_discards_stale_business_values(
+    observed_application: FastAPI,
+    metrics_provider: MetricsProviderFixture,
+    metrics_failure: SQLAlchemyError | OSError | TimeoutError,
+) -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=observed_application), base_url="http://fixture"
+    ) as client:
+        await client.post("/consume", json={"value": "payload"})
+        healthy = await client.get(MetricSetting.ENDPOINT)
+        metrics_provider.error = metrics_failure
+        failed = await client.get(MetricSetting.ENDPOINT)
+        metrics_provider.error = None
+        recovered = await client.get(MetricSetting.ENDPOINT)
+
+    healthy_samples = {
+        sample.name: sample.value
+        for family in text_string_to_metric_families(healthy.text)
+        for sample in family.samples
+    }
+    failed_samples = {
+        sample.name: sample.value
+        for family in text_string_to_metric_families(failed.text)
+        for sample in family.samples
+    }
+    recovered_samples = {
+        sample.name: sample.value
+        for family in text_string_to_metric_families(recovered.text)
+        for sample in family.samples
+    }
+    assert healthy_samples[MetricName.USERS_ACTIVE] == 1
+    assert failed.status_code == HTTPStatus.OK
+    assert failed.text.endswith("# EOF\n")
+    assert failed_samples[MetricSetting.SCRAPE_OK] == 0
+    assert MetricName.USERS_ACTIVE not in failed_samples
+    assert MetricSetting.REQUESTS in failed_samples
+    assert f"{MetricSetting.DURATION}_bucket" in failed_samples
+    assert "python_info" in failed_samples
+    assert recovered_samples[MetricSetting.SCRAPE_OK] == 1
+    assert recovered_samples[MetricName.USERS_ACTIVE] == 1
 
 
 async def test_request_correlation_and_unmatched_route_have_no_private_labels(

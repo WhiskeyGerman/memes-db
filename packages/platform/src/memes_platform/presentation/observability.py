@@ -205,14 +205,11 @@ async def metrics(request: Request) -> Response:
             for sample in await state.provider.snapshot():
                 state.gauges[sample.name].labels(state.service).set(sample.value)
             state.dependency.labels(state.service).set(1)
-        except SQLAlchemyError:
+        except (SQLAlchemyError, OSError, TimeoutError):
+            for gauge in state.gauges.values():
+                gauge.clear()
             state.dependency.labels(state.service).set(0)
             logger.warning("metrics_dependency_unavailable", exc_info=True)
-            return Response(
-                encode(state.registry),
-                media_type=content_type,
-                status_code=HTTPStatus.SERVICE_UNAVAILABLE,
-            )
     return Response(encode(state.registry), media_type=content_type)
 
 

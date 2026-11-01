@@ -1,0 +1,115 @@
+{
+  "title": "Memes DB - SLI / SLO / SLA (демо, окно 5 минут)",
+  "rows": [
+    {
+      "title": "SLI / SLO / SLA: демо-окно 5 минут; целевой период 30 дней",
+      "panels": [
+        {
+          "title": "Публичные запросы и серверные ошибки, запросов/с",
+          "width": 6,
+          "expr": [
+            "sum(rate(memes_http_requests_total{namespace=\"memes-db\",route=~\"/v1/.*\"}[1m]))",
+            "sum(rate(memes_http_requests_total{namespace=\"memes-db\",route=~\"/v1/.*\",status=~\"5..\"}[1m])) or vector(0)"
+          ],
+          "alias": [
+            "Все запросы",
+            "HTTP 5xx"
+          ]
+        },
+        {
+          "title": "Состояние PostgreSQL, пробера и сбора его метрик",
+          "width": 6,
+          "expr": [
+            "min(last_over_time(pg_up{namespace=\"memes-db\",job=\"postgres\"}[30s])) or vector(0)",
+            "min(last_over_time(probe_success{job=\"memes-db-probe\",scenario=\"catalog-feed\"}[30s])) or vector(0)",
+            "min(last_over_time(up{job=\"memes-db-probe\"}[30s])) or vector(0)"
+          ],
+          "alias": [
+            "pg_up (пропуск >30 с = 0)",
+            "probe_success (пропуск >30 с = 0)",
+            "up пробера (пропуск >30 с = 0)"
+          ]
+        },
+        {
+          "title": "HTTP SLI: ответы без 5xx, %; SLO ≥99,5%",
+          "description": "Учитываются завершённые запросы к /v1/.*. Ожидаемые клиентские ошибки 4xx не являются серверным отказом. Без запросов SLI не определён.",
+          "width": 6,
+          "expr": [
+            "100 * (1 - (sum(increase(memes_http_requests_total{namespace=\"memes-db\",route=~\"/v1/.*\",status=~\"5..\"}[5m])) or vector(0)) / sum(increase(memes_http_requests_total{namespace=\"memes-db\",route=~\"/v1/.*\"}[5m])))",
+            "vector(99.5)"
+          ],
+          "alias": [
+            "HTTP SLI, %",
+            "SLO, %"
+          ]
+        },
+        {
+          "title": "Latency SLI: ответы ≤1 с, %; SLO ≥99%",
+          "description": "Гистограмма учитывает все завершённые публичные запросы, включая ошибки. Быстрый 5xx проходит только критерий задержки; отдельно ухудшается HTTP SLI.",
+          "width": 6,
+          "expr": [
+            "100 * sum(increase(memes_http_request_duration_seconds_bucket{namespace=\"memes-db\",route=~\"/v1/.*\",le=\"1.0\"}[5m])) / sum(increase(memes_http_request_duration_seconds_count{namespace=\"memes-db\",route=~\"/v1/.*\"}[5m]))",
+            "vector(99)"
+          ],
+          "alias": [
+            "Latency SLI, %",
+            "SLO, %"
+          ]
+        },
+        {
+          "title": "PostgreSQL SLI, %; SLO ≥99,9%",
+          "description": "Доля хороших 15-секундных интервалов. Нулевой pg_up либо отсутствие свежих данных дольше 30 с означает плохой интервал.",
+          "width": 6,
+          "expr": [
+            "100 * avg_over_time((min(last_over_time(pg_up{namespace=\"memes-db\",job=\"postgres\"}[30s])) or vector(0))[5m:15s])",
+            "vector(99.9)"
+          ],
+          "alias": [
+            "PostgreSQL SLI, %",
+            "SLO, %"
+          ]
+        },
+        {
+          "title": "Лента через Gateway: SLI, %; SLO ≥99,5%; SLA ≥99%",
+          "description": "Проба должна получить 200 и ожидаемые поля JSON за 5 с. Неизвестный результат дольше 30 с считается плохим интервалом. Внешняя сеть и браузер в границы SLA не входят.",
+          "width": 6,
+          "expr": [
+            "100 * avg_over_time((min(last_over_time(probe_success{job=\"memes-db-probe\",scenario=\"catalog-feed\"}[30s])) or vector(0))[5m:15s])",
+            "vector(99.5)",
+            "vector(99)"
+          ],
+          "alias": [
+            "Доступность ленты, %",
+            "SLO, %",
+            "SLA, %"
+          ]
+        },
+        {
+          "title": "SLO пробера и SLA: 1 - выполнено, 0 - нарушено",
+          "width": 6,
+          "expr": [
+            "(100 * avg_over_time((min(last_over_time(probe_success{job=\"memes-db-probe\",scenario=\"catalog-feed\"}[30s])) or vector(0))[5m:15s])) >= bool 99.5",
+            "(100 * avg_over_time((min(last_over_time(probe_success{job=\"memes-db-probe\",scenario=\"catalog-feed\"}[30s])) or vector(0))[5m:15s])) >= bool 99"
+          ],
+          "alias": [
+            "SLO выполнен",
+            "SLA выполнен"
+          ]
+        },
+        {
+          "title": "Остаток бюджета ошибок SLA, %",
+          "description": "100% - бюджет целиком доступен; 0% - исчерпан; отрицательное значение - превышен. Это пересчёт для демо за 5 минут, а не вывод о выполнении месячного SLA.",
+          "width": 6,
+          "expr": [
+            "100 * (avg_over_time((min(last_over_time(probe_success{job=\"memes-db-probe\",scenario=\"catalog-feed\"}[30s])) or vector(0))[5m:15s]) - 0.99) / (1 - 0.99)",
+            "vector(0)"
+          ],
+          "alias": [
+            "Остаток бюджета, %",
+            "Граница бюджета"
+          ]
+        }
+      ]
+    }
+  ]
+}
