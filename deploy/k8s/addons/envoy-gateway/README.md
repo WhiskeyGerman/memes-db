@@ -11,13 +11,13 @@
 
 Из корня репозитория:
 
-```text
-kubectl --context minikube apply --server-side -k deploy/k8s/addons/envoy-gateway
+```shell
+kubectl apply --server-side -k deploy/k8s/addons/envoy-gateway
 ```
 
 Нужен доступ к GitHub для загрузки bundle и к реестрам контейнерных образов.
-Порядок ожидания готовности и создания Gateway - в
-[инструкции развёртывания](../../README.md).
+Состав стенда и маршрутизация описаны в
+[отчете о развёртывании](<../../../../docs/Отчет №2.md>).
 Установка рассчитана на minikube без CRD Gateway API, управляемых другим
 контроллером. [Документация установки](https://gateway.envoyproxy.io/docs/install/install-yaml/).
 

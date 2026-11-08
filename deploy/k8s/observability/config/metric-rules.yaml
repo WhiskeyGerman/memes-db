@@ -1,0 +1,56 @@
+groups:
+  - name: memes-db-api
+    interval: 15s
+    rules:
+      - alert: MemesDbHighHttpErrorRate
+        expr: |
+          (
+            100 * sum by (namespace, job) (
+              increase(memes_http_requests_total{namespace="memes-db",route=~"/v1/.*",status=~"5.."}[5m])
+            ) / sum by (namespace, job) (
+              increase(memes_http_requests_total{namespace="memes-db",route=~"/v1/.*"}[5m])
+            ) > 5
+          ) and on (namespace, job) (
+            sum by (namespace, job) (
+              increase(memes_http_requests_total{namespace="memes-db",route=~"/v1/.*"}[5m])
+            ) >= 20
+          )
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'HTTP 5xx в API {{ $labels.job }}'
+          description: 'За 5 минут {{ printf "%.1f" $value }}% публичных ответов имеют статус 5xx. Порог 5% превышен в течение 2 минут.'
+      - alert: MemesDbHighHttpLatency
+        expr: |
+          (
+            100 * (1 - sum by (namespace, job) (
+              increase(memes_http_request_duration_seconds_bucket{namespace="memes-db",route=~"/v1/.*",le="1.0"}[5m])
+            ) / sum by (namespace, job) (
+              increase(memes_http_request_duration_seconds_count{namespace="memes-db",route=~"/v1/.*"}[5m])
+            )) > 10
+          ) and on (namespace, job) (
+            sum by (namespace, job) (
+              increase(memes_http_request_duration_seconds_count{namespace="memes-db",route=~"/v1/.*"}[5m])
+            ) >= 20
+          )
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Медленные ответы API {{ $labels.job }}'
+          description: 'За 5 минут {{ printf "%.1f" $value }}% публичных запросов заняли дольше 1 секунды. Порог 10% превышен в течение 2 минут.'
+  - name: memes-db-python
+    interval: 15s
+    rules:
+      - alert: MemesDbHighPythonProcessCpu
+        expr: |
+          max by (namespace, job, pod) (
+            rate(process_cpu_seconds_total{namespace="memes-db",job=~"identity|catalog|processing|search"}[2m])
+          ) > 0.8
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Высокая нагрузка на CPU в {{ $labels.job }} ({{ $labels.pod }})'
+          description: 'Процесс Python использует {{ printf "%.2f" $value }} ядра. Порог 0,80 ядра превышен в течение 3 минут.'

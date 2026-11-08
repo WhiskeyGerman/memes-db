@@ -4,7 +4,9 @@ resources:
   - namespace.yaml
   - victorialogs.yaml
   - vector.yaml
-  - alerting.yaml
+  - vmalert-logs.yaml
+  - vmalert-metrics.yaml
+  - alertmanager.yaml
 configMapGenerator:
   - name: vector-config
     namespace: observability
@@ -13,7 +15,11 @@ configMapGenerator:
   - name: vmalert-rules
     namespace: observability
     files:
-      - rules.yaml=config/alerts.yaml
+      - rules.yaml=config/log-rules.yaml
+  - name: vmalert-metrics-rules
+    namespace: observability
+    files:
+      - rules.yaml=config/metric-rules.yaml
   - name: alertmanager-config
     namespace: observability
     files:

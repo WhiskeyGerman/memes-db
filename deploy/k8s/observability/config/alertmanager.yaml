@@ -1,10 +1,19 @@
-global:
-  resolve_timeout: 1m
 route:
-  receiver: local
-  group_by: [alertname, service.name]
-  group_wait: 1s
-  group_interval: 10s
-  repeat_interval: 1h
+  receiver: telegram
+  group_by: [alertname, namespace, job, pod, service.name]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
 receivers:
-  - name: local
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /etc/alertmanager/telegram/bot-token
+        chat_id_file: /etc/alertmanager/telegram/chat-id
+        send_resolved: true
+        parse_mode: ""
+        message: |-
+          {{ range .Alerts -}}
+          {{ if eq .Status "firing" }}СРАБОТАЛ{{ else }}СНЯТ{{ end }} · {{ .Labels.alertname }} · {{ .Labels.severity }}
+          {{ .Annotations.summary }}
+          {{ if eq .Status "firing" }}{{ .Annotations.description }}{{ end }}
+          {{ end -}}

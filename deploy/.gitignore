@@ -3,7 +3,4 @@
 !/.env.example
 !/.env.worker.example
 /models/
-/results/*
-!/results/task-03/
-/results/task-03/*
-!/results/task-03/*.jpg
+/results/

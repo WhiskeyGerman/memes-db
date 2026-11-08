@@ -14,6 +14,7 @@
 deploy/models
 deploy/results
 deploy/k8s/.local
+docs
 **/tests
 htmlcov
 .coverage
