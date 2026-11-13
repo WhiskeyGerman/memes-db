@@ -1,0 +1,35 @@
+deploymentStrategy:
+  type: Recreate
+
+persistence:
+  enabled: true
+  storageClassName: standard
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+grafana.ini:
+  analytics:
+    reporting_enabled: false
+  users:
+    allow_sign_up: false
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: VictoriaMetrics
+        uid: victoria-metrics
+        type: prometheus
+        access: proxy
+        url: http://victoria-metrics.monitoring.svc:8428
+        isDefault: true
+        editable: false
+        jsonData:
+          timeInterval: 15s

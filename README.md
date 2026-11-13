@@ -55,3 +55,4 @@ poetry run pytest -p no:cacheprovider
 - [Отчет №4. Сбор метрик и мониторинг](<docs/Отчет №4.md>)
 - [Отчет №5. SLI, SLO и SLA](<docs/Отчет №5.md>)
 - [Отчет №6. Алерты и уведомления в Telegram](<docs/Отчет №6.md>)
+- [Отчёт №7. Дашборды Grafana](<docs/Отчёт №7.md>)
